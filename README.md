@@ -5,31 +5,37 @@ Prosthetic Limbs**. Plain HTML/CSS/JS — no build step, no dependencies beyond 
 for the equations.
 
 ```
-index.html          the whole page
-style.css
-script.js           nav, image lightbox, BibTeX copy
-images/             figures rendered from the paper's PDFs (200 dpi, 1800 px wide)
-static/             put the paper PDF here when it is ready
+docs/index.html     the whole page          <- GitHub Pages serves docs/
+docs/style.css
+docs/script.js      nav, image lightbox, BibTeX copy
+docs/images/        figures rendered from the paper's PDFs (200 dpi, 1800 px wide)
+docs/static/        put the paper PDF here when it is ready
 ```
+
+The page lives in `docs/` so the repository root stays free for the code release later.
 
 ## Preview locally
 
 ```bash
-python3 -m http.server 8000 --directory .
+python3 -m http.server 8000 --directory docs
 # open http://localhost:8000
 ```
 
 ## Publish on GitHub Pages
 
+Create an empty public repository on GitHub (no README, no .gitignore), then:
+
 ```bash
-git init && git add -A && git commit -m "ProPose project page"
-git remote add origin git@github.com:<user>/<repo>.git
+cd /home/sora/workspace/ProPose_Page
+git remote add origin git@github.com:SoraLink/ProPose.git
 git push -u origin main
 ```
 
-Then in the repo: **Settings → Pages → Build and deployment → Deploy from a branch → `main` / `/ (root)`**.
-The page appears at `https://<user>.github.io/<repo>/`. `.nojekyll` is present so GitHub serves the
-files as they are.
+In the repository: **Settings → Pages → Build and deployment → Deploy from a branch →
+branch `main`, folder `/docs` → Save**. After a minute the page is live at
+`https://soralink.github.io/ProPose/`. `.nojekyll` is present so GitHub serves the files as they are.
+
+To update it later, edit the files and `git push` — Pages rebuilds by itself.
 
 ## Turning the "coming soon" buttons on
 
@@ -40,14 +46,15 @@ real link when the artefact is public, e.g. the paper:
 <a href="static/ProPose_paper.pdf" class="btn btn-primary">&#128196; Paper (PDF)</a>
 ```
 
-and the corresponding card in the **Paper, Code & Data** section (drop the `<span class="badge">`).
+and drop the `<span class="badge">coming soon</span>` from the matching card in the
+**Paper, Code & Data** section.
 
 ## Regenerating the figures
 
 The images come straight from `ProPose_Overleaf/figures/`:
 
 ```bash
-pdftoppm -png -r 200 -scale-to-x 1800 -scale-to-y -1 -singlefile <fig>.pdf images/<fig>
+pdftoppm -png -r 200 -scale-to-x 1800 -scale-to-y -1 -singlefile <fig>.pdf docs/images/<fig>
 ```
 
 Photographic figures are then saved as JPEG (quality 90) to keep the page light; the bar charts stay PNG.
