@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProPose: Topology-Unified 2D Pose Estimation across Intact, Residual and Prosthetic Limbs</title>
+<meta name="description" content="ProPose is a large-scale benchmark that unifies intact, residual and prosthetic limbs in a single 2D pose annotation protocol (Omni-Pose), together with a Real-to-Synthetic data expansion pipeline and the structure-aware ProLoss objective.">
+<meta property="og:title" content="ProPose: Topology-Unified 2D Pose Estimation across Intact, Residual and Prosthetic Limbs">
+<meta property="og:description" content="A prosthesis-aware human pose benchmark: 36.4k images, 63.0k instances, 31 keypoints, and a per-joint semantic type (Biological / Prosthetic / Absent).">
+<meta property="og:image" content="images/topology_ambiguity_comparison.jpg">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="style.css">
+<script>
+  window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['$$', '$$']] },
+                     options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] } };
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-container">
+    <div class="nav-logo">Pro<span>Pose</span></div>
+    <ul class="nav-menu" id="navMenu">
+      <li><a href="#abstract">Abstract</a></li>
+      <li><a href="#protocol">Omni-Pose</a></li>
+      <li><a href="#dataset">Dataset</a></li>
+      <li><a href="#pipeline">Pipeline</a></li>
+      <li><a href="#method">ProLoss</a></li>
+      <li><a href="#results">Results</a></li>
+      <li><a href="#download">Download</a></li>
+    </ul>
+    <div class="hamburger" id="hamburger"><span class="bar"></span><span class="bar"></span><span class="bar"></span></div>
+  </div>
+</nav>
+
+<main>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="hero-bg"></div>
+  <div class="container">
+    <div class="venue">Under review &middot; IEEE Transactions on Image Processing</div>
+    <h1 class="paper-title">
+      <span class="brand">ProPose</span>: Topology-Unified 2D Pose Estimation across
+      Intact, Residual and Prosthetic Limbs
+    </h1>
+
+    <div class="authors">
+      <span class="author">Tianye Qi<sup>1</sup></span>
+      <span class="author">Tengyue Zhang<sup>2</sup></span>
+      <span class="author">Jiaying Ying<sup>1</sup></span>
+      <span class="author">Tianqing Zhu<sup>3</sup></span>
+      <span class="author">Xin Yu<sup>2&dagger;</sup></span>
+    </div>
+    <div class="affiliations">
+      <div><sup>1</sup>The University of Queensland</div>
+      <div><sup>2</sup>Australian Institute for Machine Learning, Adelaide University</div>
+      <div><sup>3</sup>City University of Macau</div>
+    </div>
+    <div class="author-note"><sup>&dagger;</sup>Corresponding author</div>
+
+    <div class="paper-links">
+      <!-- When the PDF is ready, drop it at static/ProPose_paper.pdf and swap this for:
+           <a href="static/ProPose_paper.pdf" class="btn btn-primary">&#128196; Paper (PDF)</a> -->
+      <span class="btn btn-disabled">&#128196; Paper <span class="tag">coming soon</span></span>
+      <span class="btn btn-disabled">&#128187; Code <span class="tag">coming soon</span></span>
+      <span class="btn btn-disabled">&#128190; Dataset <span class="tag">coming soon</span></span>
+      <a href="#dataset" class="btn btn-secondary">&#128200; Explore the benchmark</a>
+    </div>
+  </div>
+</header>
+
+<!-- ============ ABSTRACT ============ -->
+<section id="abstract" class="section">
+  <div class="container">
+    <h2 class="section-title">Abstract</h2>
+    <div class="abstract lead">
+      <p>Driven by the availability of large-scale datasets, Human Pose Estimation (HPE) plays a critical role in
+      numerous downstream tasks. However, mainstream benchmarks exhibit severe representation bias, predominantly
+      featuring able-bodied individuals. While a few pioneering datasets have attempted to address limb differences,
+      their annotation protocols fail to generalize, struggling to represent specialized mechanical structures like
+      running blades or unprosthetized residual limbs. To bridge this gap, we introduce
+      <strong class="hl">ProPose</strong>, a large-scale benchmark featuring a novel annotation protocol that unifies
+      the topological representation of biological limbs, diverse prostheses, and physical absences within a single
+      framework. Because real-world prosthetic images are inherently scarce and exhibit extreme long-tail
+      distributions, we design a <strong class="hl">Real-to-Synthetic data expansion pipeline</strong> to explicitly
+      synthesize and expand the underrepresented cases.</p>
+      <p>However, simply training existing models on this enriched dataset often leads to suboptimal solutions, as
+      they estimate each keypoint independently and might hallucinate non-existent joints on mechanical structures.
+      To resolve this, we propose <strong class="hl">ProLoss</strong>, a structure-aware objective that enforces
+      keypoint dependencies within a single limb to prevent unrealistic limb predictions. Extensive experiments
+      demonstrate that our approach improves the classification accuracy of long-tail prosthetic joints by 2% to 6%
+      without compromising spatial coordinate localization performance. This work sets a foundation for inclusive
+      pose estimation, unlocking new possibilities for understanding the interactions between human bodies and
+      assistive devices.</p>
+    </div>
+
+    <figure>
+      <img src="images/topology_ambiguity_comparison.jpg" alt="Topological ambiguity resolved by ProPose, on an upper limb and a lower limb">
+      <figcaption><b>Resolving topological ambiguity</b>, on an upper limb (top) and a lower limb (bottom). Unlike
+      COCO, which hallucinates biological joints on mechanical structures, and LDPose, which truncates the topology at
+      the residual limb, ProPose explicitly disentangles joint semantics to reconstruct the complete kinematic chain
+      across intact, residual and prosthetic limbs. In the top row the elbow and wrist of the prosthetic arm do not
+      exist and carry no coordinate: COCO has no way to record that and must place them on the device, LDPose stops at
+      the residual limb, and only ProPose ends the chain where the limb ends and resumes it at the prosthetic
+      fingertip.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ============ OMNI-POSE PROTOCOL ============ -->
+<section id="protocol" class="section">
+  <div class="container">
+    <h2 class="section-title">Omni-Pose Representation Protocol</h2>
+    <p class="section-sub">One topology for intact, residual, prosthetic and absent limbs &mdash; achieved by adding
+    distal extremities and a semantic type to every joint.</p>
+
+    <h3>Why a new protocol?</h3>
+    <p>Standard protocols such as COCO-17 are designed for able-bodied individuals. LDPose appends 8 residual keypoints
+    to localise the stump, but leaves prosthetic devices unannotated. ProGait labels prostheses by mapping mechanical
+    parts onto biological joints, which works for anthropomorphic devices but breaks down for non-biological geometries:
+    a carbon-fibre running blade simply has no anatomical ankle. None of them can express the difference between
+    <em>a joint that exists in a device</em>, <em>a joint that exists in flesh</em>, and <em>a joint that does not
+    exist at all</em>.</p>
+
+    <h3>31-keypoint topology</h3>
+    <ul class="feature-list">
+      <li><b>17 standard body keypoints</b> &mdash; the COCO topology (head, torso, limb joints).</li>
+      <li><b>8 residual keypoints</b> &mdash; the physical endpoint of the stump at each amputation level, inherited
+      from LDPose.</li>
+      <li><b>6 distal extremities (new)</b> &mdash; <em>fingertip</em>, <em>heel</em> and <em>toe</em>, left and right.
+      They anchor the end of the kinematic chain and the effective contact points, so a prosthesis is described
+      consistently no matter what its mechanical design looks like.</li>
+    </ul>
+
+    <h3>Semantic type: the second annotation axis</h3>
+    <p>Every keypoint additionally carries a semantic type
+    \(c \in \{\texttt{Biological}, \texttt{Prosthetic}, \texttt{Absent}\}\), which is what makes a single topology able
+    to describe every limb configuration:</p>
+    <div class="card-grid">
+      <div class="card bio">
+        <h4><span class="dot bio"></span> Biological</h4>
+        <p>A joint realised by the body itself. Covers both intact limbs and the residual endpoints of an amputated
+        limb; the two are distinguished by keypoint ordering.</p>
+      </div>
+      <div class="card pros">
+        <h4><span class="dot pros"></span> Prosthetic</h4>
+        <p>A joint realised by a mechanical device &mdash; a prosthetic elbow, a blade, a myoelectric hand. It has a
+        coordinate, but it is not anatomy.</p>
+      </div>
+      <div class="card abs">
+        <h4><span class="dot abs"></span> Absent</h4>
+        <p>A joint that physically does not exist, and therefore <b>carries no coordinate at all</b>. The kinematic
+        chain simply ends where the limb ends.</p>
+      </div>
+    </div>
+    <p>Limb joints (including the new distal points) admit all three types; residual keypoints admit only
+    <em>Biological</em> or <em>Absent</em>; core joints such as head and torso are universally <em>Biological</em>.
+    The attribute is assigned <b>per joint, not per limb</b>: a biological wrist can be <em>Absent</em> while the
+    fingertips of the prosthetic hand attached below it are <em>Prosthetic</em>.</p>
+
+    <h4>Visibility protocol</h4>
+    <p>Conventional visibility flags describe whether a <em>coordinate</em> can be observed, not whether a joint
+    <em>exists</em>. When a residual limb is clearly visible and no prosthesis is worn, the absence of the subsequent
+    joints is itself an observable anatomical fact. We therefore give such keypoints a visible flag (\(v=2\)) together
+    with the <em>Absent</em> type: the absence is visible and deterministic, even though no coordinate is annotated.</p>
+
+    <figure>
+      <img src="images/omni_pose_protocol.jpg" alt="The Omni-Pose protocol: intact, residual, prosthetic and absent limb configurations in one topology">
+      <figcaption><b>The Omni-Pose protocol.</b> Intact, residual, prosthetic and absent limb configurations within a
+      single topology; each corner magnifies the limb of the photograph it points to. Filled markers are annotations
+      taken from the dataset. Absent joints carry no coordinate by definition, so they are drawn as open dashed rings
+      at their inferred position for illustration only.</figcaption>
+    </figure>
+
+    <figure>
+      <img src="images/omni_pose_protocol_examples.jpg" alt="Omni-Pose annotations across the ProPose dataset">
+      <figcaption><b>The protocol applied across ProPose.</b> The examples span the configurations the protocol has to
+      describe: upper and lower limb, amputation above and below the joint, one side and both, and limbs with and
+      without a prosthetic device. A keypoint is coloured by its semantic type, so a single skeleton can mix all
+      three.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ============ DATASET ============ -->
+<section id="dataset" class="section">
+  <div class="container">
+    <h2 class="section-title">The ProPose Dataset</h2>
+    <p class="section-sub">The first large-scale 2D pose benchmark that annotates intact, residual
+    <em>and</em> prosthetic limbs under one protocol.</p>
+
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-number">36.4k</div><div class="stat-label">Images</div></div>
+      <div class="stat-card"><div class="stat-number">63.0k</div><div class="stat-label">Annotated instances</div></div>
+      <div class="stat-card"><div class="stat-number">31</div><div class="stat-label">Keypoints per person</div></div>
+      <div class="stat-card"><div class="stat-number">3</div><div class="stat-label">Semantic types per joint</div></div>
+      <div class="stat-card"><div class="stat-number">9,558</div><div class="stat-label">Synthesised training images</div></div>
+      <div class="stat-card"><div class="stat-number">100%</div><div class="stat-label">Real photographs in the test set</div></div>
+    </div>
+
+    <h3>Comparison with existing pose benchmarks</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="left">Dataset</th><th>Images / Videos</th><th>Instances</th><th>Avg. poses per image</th>
+            <th>Limb types</th><th>Annotation source</th><th>Env. complexity</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="left">MPII</td><td>25k</td><td>40k</td><td>~2</td><td>Int</td><td>Crowd-sourced</td><td>Moderate</td></tr>
+          <tr><td class="left">MS COCO</td><td>200k</td><td>250k</td><td>~2</td><td>Int</td><td>Crowd-sourced</td><td>High</td></tr>
+          <tr><td class="left">CrowdPose</td><td>20k</td><td>80k</td><td>~4</td><td>Int</td><td>Crowd-sourced</td><td>High</td></tr>
+          <tr><td class="left">OCHuman</td><td>4.7k</td><td>8k</td><td>~2</td><td>Int</td><td>Crowd-sourced</td><td>High</td></tr>
+          <tr><td class="left">PoseTrack21</td><td>66k</td><td>177k</td><td>~2.5</td><td>Int</td><td>Crowd-sourced</td><td>High</td></tr>
+          <tr><td class="left">FreeMan</td><td>11.3m</td><td>11.3m</td><td>~1</td><td>Int</td><td>Crowd-sourced</td><td>High</td></tr>
+          <tr><td class="left">Human3.6M</td><td>3.6m</td><td>3.6m</td><td>~1</td><td>Int</td><td>Experts</td><td>Low</td></tr>
+          <tr><td class="left">LDPose</td><td>28k</td><td>72.7k</td><td>~3</td><td>Int, Res</td><td>Medical experts</td><td>High</td></tr>
+          <tr><td class="left">ProGait</td><td>412</td><td>412</td><td>~1</td><td>Int, Pros</td><td>Medical experts</td><td>Moderate</td></tr>
+          <tr><td class="left">WheelPose</td><td>2.5k</td><td>2.6k</td><td>~1</td><td>Int</td><td>Generated</td><td>Moderate</td></tr>
+          <tr class="ours"><td class="left">ProPose (ours)</td><td>36.4k</td><td>63.0k</td><td>~2</td><td>Int, Res, Pros</td><td>Medical experts</td><td>High</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-note">Int = intact, Res = residual, Pros = prosthetic. While recent efforts have introduced datasets
+    for specific disabilities, none of the existing benchmarks unifies all three limb types.</p>
+
+    <h3>Mitigating the long tail</h3>
+    <p>Prosthetic joints are not merely rare, they are rare in a structured way: the further up the limb the
+    amputation, the fewer the examples. Relative to the LDPose image subset annotated under the same protocol, the
+    prosthetic share of <b>elbow</b> keypoints rises from <mark>0.19% to 5.81%</mark> (a 31&times; increase) and that of
+    <b>wrists</b> from <mark>1.00% to 8.63%</mark> (8.6&times;), while the already better-represented lower-limb joints
+    change by at most 1.5&times;. The expansion is concentrated exactly where the tail was thinnest. The test set is
+    expanded as well: prosthetic elbow and wrist keypoints grow from 38 to 129 and from 135 to 457. Across amputation
+    levels, ProPose adds at least 1,400 annotated residual keypoints, and 6,770 at the above-elbow level.</p>
+
+    <figure>
+      <img src="images/stat_source.png" alt="Prosthetic share of each joint's annotations, split by data source">
+      <figcaption><b>Prosthetic keypoints as a share of each joint's annotations</b>, split by the data source that
+      contributed them; the multiplier in brackets is the growth of that share relative to the LDPose image subset
+      alone.</figcaption>
+    </figure>
+
+    <div class="card-grid">
+      <figure style="margin:0">
+        <img src="images/stat_residual.png" alt="Residual keypoints annotated as physically present">
+        <figcaption>Residual keypoints annotated as physically present, in the LDPose subset and in ProPose.</figcaption>
+      </figure>
+      <figure style="margin:0">
+        <img src="images/stat_semantic.png" alt="Composition of each joint's annotations by semantic type">
+        <figcaption>Composition of each row's annotated keypoints by semantic type; each row is normalised
+        independently.</figcaption>
+      </figure>
+    </div>
+
+    <h3>Annotation quality and ethics</h3>
+    <ul class="feature-list">
+      <li><b>Two independent expert annotations.</b> Every image is annotated by two biomechanics experts; a third
+      expert resolves disagreements. 94.0% of samples reach direct agreement, 5.8% are resolved after third-expert
+      review, and 0.2% are discarded as unresolvably ambiguous.</li>
+      <li><b>Cascade de-duplication.</b> MD5 hashing removes exact duplicates, perceptual hashing (Hamming distance
+      &le; 5) clusters near-duplicates, and the clusters are reviewed by hand.</li>
+      <li><b>De-identification.</b> Where copyright or licensing status is unclear, faces are replaced with a synthetic,
+      non-existent identity, removing biometric features while preserving pose.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ PIPELINE ============ -->
+<section id="pipeline" class="section">
+  <div class="container">
+    <h2 class="section-title">Real-to-Synthetic Data Expansion</h2>
+    <p class="section-sub">Web crawling alone cannot fix a 0.2% class. The pipeline generates the missing
+    configurations &mdash; and throws most of them away.</p>
+
+    <figure>
+      <img src="images/data_expansion_pipeline.png" alt="Overview of the Real-to-Synthetic data expansion pipeline">
+      <figcaption><b>Overview of the pipeline.</b> Phase&nbsp;1 collects and de-duplicates web imagery and sets aside a
+      strictly isolated real-world test set. Phase&nbsp;2 uses instruction-driven editing to outpaint truncated crops
+      into full-body images and to edit poses under kinematic constraints, with targeted oversampling of rare
+      prosthetic categories. Phase&nbsp;3 filters the generated images by cascade de-duplication, dual verification
+      against realism and kinematics, and de-identification.</figcaption>
+    </figure>
+
+    <ol class="phase-list">
+      <li><b>Phase 1 &mdash; Data collection.</b> After de-duplication and manual screening, 1,807 high-quality
+      real-world images are obtained. 1,370 are used as seeds for generation; the remaining 437 (covering 499 unseen
+      subjects) go into the test set.</li>
+      <li><b>Phase 2 &mdash; Instruction-driven image-to-image synthesis.</b> <em>Contextual outpainting</em> turns
+      close-up crops with truncated limbs into half- or full-body images; <em>pose editing and balancing</em> alters
+      the subject's posture from text prompts that explicitly declare which joints may bend and which prosthetic
+      components are rigid, with targeted oversampling of rare categories such as prosthetic elbows and knees.</li>
+      <li><b>Phase 3 &mdash; Quality and privacy assurance.</b> Three annotators inspect each generated image and
+      discard visual artifacts and kinematic implausibilities. Roughly 62% of generated images are discarded;
+      <b>9,558</b> are retained for training. No generated image enters the test split, so evaluation is performed
+      entirely on real photographs.</li>
+    </ol>
+
+    <figure>
+      <img src="images/synthetic_generation_examples.jpg" alt="Outpainting and pose-editing examples">
+      <figcaption><b>Generative editing examples.</b> Outpainting and pose editing for diverse joint types.</figcaption>
+    </figure>
+
+    <h3>Which editor? A quality-control study</h3>
+    <p>Before fixing the editor used in the pipeline, we generated 100 candidate images with each candidate model and
+    manually screened them against three task-specific criteria: whether the pose is clearly edited, whether the
+    original prosthetic or residual-limb condition is preserved, and whether severe visual artifacts are present. A
+    candidate is accepted only if all three hold.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="left">Generative model</th><th>Generated</th><th>Accepted &uarr;</th><th>Acceptance rate &uarr;</th>
+            <th>Pose edited &uarr;</th><th>Prosthesis preserved &uarr;</th><th>Artifact rate &darr;</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="ours"><td class="left">Gemini Flash Image / Nano Banana 2</td><td>100</td><td>80</td><td>80.0%</td><td>100.0%</td><td>96.0%</td><td>4.0%</td></tr>
+          <tr class="ours"><td class="left">Gemini 3 Pro Image / Nano Banana Pro</td><td>100</td><td>72</td><td>72.0%</td><td>100.0%</td><td>88.0%</td><td>12.0%</td></tr>
+          <tr><td class="left">GPT Image 2</td><td>100</td><td>36</td><td>36.0%</td><td>36.0%</td><td>100.0%</td><td>8.0%</td></tr>
+          <tr><td class="left">Seedream / Jimeng</td><td>100</td><td>16</td><td>16.0%</td><td>36.0%</td><td>56.0%</td><td>4.0%</td></tr>
+          <tr><td class="left">Qwen-Image-Edit</td><td>100</td><td>12</td><td>12.0%</td><td>28.0%</td><td>28.0%</td><td>52.0%</td></tr>
+          <tr><td class="left">FireRed-Image-Edit</td><td>100</td><td>8</td><td>8.0%</td><td>20.0%</td><td>20.0%</td><td>72.0%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-note">The Gemini family gives the best balance between controllable pose editing, prosthesis
+    preservation and low artifact rate; <code>gemini-3-pro-image-preview</code> is used for the final data
+    construction.</p>
+  </div>
+</section>
+
+<!-- ============ METHOD ============ -->
+<section id="method" class="section">
+  <div class="container">
+    <h2 class="section-title">ProLoss: a Structure-Aware Objective</h2>
+    <p class="section-sub">Keypoints on one limb are not independent. A residual elbow forbids a biological wrist
+    below it &mdash; and the loss should say so.</p>
+
+    <h3>Problem formulation</h3>
+    <p>We formulate Omni-Human Pose Estimation as joint coordinate regression and semantic attribution. For an input
+    image \(I \in \mathbb{R}^{H \times W \times 3}\) the model predicts \(K\) keypoints</p>
+    <div class="eq">$$\mathbf{p}_i = (\mathbf{x}_i,\, s_i,\, c_i), \qquad
+      \mathbf{x}_i \in \mathbb{R}^2,\; s_i \in [0,1],\;
+      c_i \in \mathcal{C} = \{\texttt{Bio}, \texttt{Pros}, \texttt{Abs}\}.$$</div>
+    <p>For keypoints labelled <code>Abs</code> the coordinate has no physical referent, so coordinate supervision is
+    masked out while the type label is kept for classification.</p>
+
+    <h3>Distribution-aligned supervision</h3>
+    <p>The imbalance between biological and prosthetic/absent joints is severe enough that a plain cross-entropy is
+    dominated by the majority class. We apply a decoupled inverse-square-root weight to the classification branch
+    only:</p>
+    <div class="eq">$$\omega_{i,c}^{cls} = \frac{1/\sqrt{N_{i,c}}}
+      {\frac{1}{|\mathcal{C}_{valid}|}\sum_{j \in \mathcal{C}_{valid}} 1/\sqrt{N_{i,j}}},$$</div>
+    <div class="eq">$$\mathcal{L}_{reg} = \frac{1}{K}\sum_{i=1}^{K}\mathbb{1}(v_i>0 \ \&\ c_i^* \neq \text{absent})\,
+      \ell(\mathbf{p}_i,\hat{\mathbf{p}}_i), \qquad
+      \mathcal{L}_{cls} = -\frac{1}{K}\sum_{i=1}^{K}\mathbb{1}(v_i>0)\,\omega_{i,c_i^*}^{cls}
+      \sum_{c \in \mathcal{C}} y^*_{i,c}\log \hat{y}_{i,c}.$$</div>
+    <p>Spatial regression is unaffected by the semantic long tail, and our ablation confirms that re-weighting it
+    actively hurts &mdash; so the weighting stays on the classification branch alone.</p>
+
+    <h3>Bio-Contrastive Boundary Loss</h3>
+    <p>Each limb branch admits exactly one anatomically valid terminal state. For an annotated residual keypoint
+    \(r\) we define its <em>mutually exclusive set</em> \(\Omega_r\) of keypoints on the same limb branch that cannot
+    coexist with it, and contrast the biological confidence of \(r\) against them:</p>
+    <div class="eq">$$\mathcal{P}_r = \frac{\exp(p_r^{\text{bio}}/\tau)}
+      {\exp(p_r^{\text{bio}}/\tau) + \sum_{j \in \Omega_r}\mathbb{1}(v_j>0)\exp(p_j^{\text{bio}}/\tau)},
+      \qquad
+      \mathcal{L}_{bio} = -\frac{1}{|\mathcal{R}|}\sum_{r \in \mathcal{R}}
+      \mathbb{1}(v_r>0\ \&\ c_r^*=\textit{Biological}) \log \mathcal{P}_r .$$</div>
+    <p>Minimising \(\mathcal{L}_{bio}\) raises the probability of the true residual endpoint while suppressing
+    biological predictions for its descendant joints &mdash; a kinematic filter against hallucinated limbs. The total
+    objective is</p>
+    <div class="eq">$$\mathcal{L}_{total} = \lambda_{reg}\mathcal{L}_{reg} + \lambda_{cls}\mathcal{L}_{cls}
+      + \lambda_{bio}\mathcal{L}_{bio},$$</div>
+    <p>with \(\lambda_{reg}=1\), \(\lambda_{cls}=0.05\), \(\lambda_{bio}=0.01\) and \(\tau=0.2\) in all experiments.
+    AP and Type-Acc remain stable under moderate variation of these values, so ProLoss needs no task-specific
+    tuning.</p>
+  </div>
+</section>
+
+<!-- ============ RESULTS ============ -->
+<section id="results" class="section">
+  <div class="container">
+    <h2 class="section-title">Experiments</h2>
+    <p class="section-sub">All models are implemented in MMPose on identical splits. Geometric accuracy is measured by
+    AP/AR (<code>Absent</code> keypoints excluded, since their locations are meaningless); semantic accuracy is
+    measured by per-type accuracy over all predicted types.</p>
+
+    <h3>Benchmark on the ProPose test set</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="left">Method</th><th>Training</th><th>Backbone</th><th>Input size</th>
+            <th>AP</th><th>AP<sup>50</sup></th><th>AP<sup>75</sup></th><th>AR</th><th>AR<sup>50</sup></th><th>AR<sup>75</sup></th>
+            <th>Type-Acc</th><th>Bio</th><th>Pros</th><th>Abs</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="pretrain"><td class="left">YoloxPose</td><td>Pretrain</td><td>YoloxPose-T</td><td>416&times;416</td><td>41.5</td><td>60.3</td><td>46.2</td><td>46.9</td><td>65.3</td><td>51.5</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr class="pretrain"><td class="left"></td><td>Pretrain</td><td>YoloxPose-S</td><td>640&times;640</td><td>48.8</td><td>66.2</td><td>54.8</td><td>55.1</td><td>71.3</td><td>60.6</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr class="pretrain"><td class="left"></td><td>Pretrain</td><td>YoloxPose-M</td><td>640&times;640</td><td>52.2</td><td>68.7</td><td>59.1</td><td>58.5</td><td>73.3</td><td>64.8</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr class="pretrain"><td class="left"></td><td>Pretrain</td><td>YoloxPose-L</td><td>640&times;640</td><td>53.4</td><td>69.3</td><td>60.2</td><td>59.8</td><td>73.8</td><td>65.8</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>YoloxPose-T</td><td>416&times;416</td><td>41.9</td><td>67.3</td><td>43.0</td><td>49.0</td><td>72.5</td><td>50.4</td><td>82.9</td><td>89.7</td><td>53.8</td><td>27.7</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>YoloxPose-S</td><td>640&times;640</td><td>50.5</td><td>74.3</td><td>53.6</td><td>58.6</td><td>79.3</td><td>61.4</td><td>86.8</td><td>90.4</td><td>64.6</td><td>52.1</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>YoloxPose-M</td><td>640&times;640</td><td>52.2</td><td>76.3</td><td>55.6</td><td>60.5</td><td>82.0</td><td>63.4</td><td>88.5</td><td>92.3</td><td>66.3</td><td>54.0</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>YoloxPose-L</td><td>640&times;640</td><td>53.3</td><td>76.7</td><td>56.3</td><td>61.0</td><td>81.2</td><td>63.5</td><td>89.0</td><td>92.6</td><td>69.4</td><td>56.6</td></tr>
+
+          <tr class="pretrain"><td class="left">Swin Transformer</td><td>Pretrain</td><td>Swin-T</td><td>256&times;192</td><td>74.7</td><td>95.7</td><td>83.5</td><td>78.9</td><td>96.1</td><td>85.9</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr class="pretrain"><td class="left"></td><td>Pretrain</td><td>Swin-B</td><td>256&times;192</td><td>76.4</td><td>95.8</td><td>85.6</td><td>80.5</td><td>96.1</td><td>87.2</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr class="pretrain"><td class="left"></td><td>Pretrain</td><td>Swin-B</td><td>384&times;288</td><td>76.1</td><td>95.7</td><td>85.6</td><td>80.5</td><td>96.3</td><td>87.4</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr class="pretrain"><td class="left"></td><td>Pretrain</td><td>Swin-L</td><td>256&times;192</td><td>76.1</td><td>95.8</td><td>85.7</td><td>80.5</td><td>96.5</td><td>87.2</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr class="pretrain"><td class="left"></td><td>Pretrain</td><td>Swin-L</td><td>384&times;288</td><td>76.8</td><td>95.8</td><td>86.6</td><td>81.3</td><td>96.4</td><td>88.4</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>Swin-T</td><td>256&times;192</td><td>85.7</td><td>96.5</td><td>91.9</td><td>88.1</td><td>97.7</td><td>93.2</td><td>91.5</td><td>94.0</td><td>71.9</td><td>68.0</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>Swin-B</td><td>256&times;192</td><td>87.7</td><td>96.7</td><td>93.3</td><td>89.8</td><td>97.7</td><td>94.2</td><td>96.9</td><td>98.7</td><td>86.2</td><td>82.9</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>Swin-B</td><td>384&times;288</td><td>88.7</td><td>96.7</td><td>93.4</td><td>90.4</td><td>97.7</td><td>94.3</td><td><b>97.2</b></td><td><b>99.0</b></td><td>86.0</td><td>82.6</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>Swin-L</td><td>256&times;192</td><td>86.4</td><td>96.7</td><td>92.2</td><td>88.8</td><td>97.5</td><td>93.7</td><td>96.7</td><td>98.6</td><td>83.6</td><td>82.7</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>Swin-L</td><td>384&times;288</td><td>87.1</td><td>96.6</td><td>92.3</td><td>89.0</td><td>97.5</td><td>93.4</td><td>97.1</td><td>98.8</td><td>85.0</td><td>83.3</td></tr>
+
+          <tr class="pretrain"><td class="left">RTMPose</td><td>Pretrain</td><td>RTMPose-T</td><td>256&times;192</td><td>70.7</td><td>92.7</td><td>80.8</td><td>75.5</td><td>94.0</td><td>83.4</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr class="pretrain"><td class="left"></td><td>Pretrain</td><td>RTMPose-S</td><td>256&times;192</td><td>73.3</td><td>94.7</td><td>83.2</td><td>78.1</td><td>95.5</td><td>85.5</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr class="pretrain"><td class="left"></td><td>Pretrain</td><td>RTMPose-M</td><td>256&times;192</td><td>76.1</td><td>95.8</td><td>85.6</td><td>80.8</td><td>96.3</td><td>87.8</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr class="pretrain"><td class="left"></td><td>Pretrain</td><td>RTMPose-L</td><td>256&times;192</td><td>77.2</td><td>95.9</td><td>86.8</td><td>81.9</td><td>96.8</td><td>88.9</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>RTMPose-T</td><td>256&times;192</td><td>83.0</td><td>95.7</td><td>89.2</td><td>85.1</td><td>96.8</td><td>90.4</td><td>93.8</td><td>96.3</td><td>75.3</td><td>72.4</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>RTMPose-S</td><td>256&times;192</td><td>86.1</td><td>96.6</td><td>92.3</td><td>87.9</td><td>97.4</td><td>93.0</td><td>94.7</td><td>96.8</td><td>78.5</td><td>78.0</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>RTMPose-M</td><td>256&times;192</td><td>88.8</td><td><b>96.8</b></td><td>93.6</td><td>90.4</td><td>97.8</td><td>94.8</td><td>95.8</td><td>97.8</td><td>82.5</td><td>80.3</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>RTMPose-L</td><td>256&times;192</td><td>89.9</td><td><b>96.8</b></td><td><b>94.6</b></td><td>91.3</td><td>97.9</td><td>95.1</td><td>96.5</td><td>98.2</td><td>85.3</td><td>83.7</td></tr>
+
+          <tr class="pretrain"><td class="left">ViTPose</td><td>Pretrain</td><td>ViT-S</td><td>256&times;192</td><td>76.3</td><td>95.7</td><td>85.6</td><td>80.6</td><td>96.1</td><td>87.3</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr class="pretrain"><td class="left"></td><td>Pretrain</td><td>ViT-B</td><td>256&times;192</td><td>78.1</td><td>95.7</td><td>87.7</td><td>82.6</td><td>96.8</td><td>89.7</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr class="pretrain"><td class="left"></td><td>Pretrain</td><td>ViT-L</td><td>256&times;192</td><td>80.5</td><td>96.9</td><td>90.8</td><td>85.1</td><td>97.6</td><td>82.3</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>ViT-S</td><td>256&times;192</td><td>81.7</td><td>95.5</td><td>88.0</td><td>84.5</td><td>96.5</td><td>89.9</td><td>93.7</td><td>95.9</td><td>75.5</td><td>73.0</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>ViT-B</td><td>256&times;192</td><td>82.0</td><td>95.5</td><td>88.9</td><td>84.7</td><td>96.8</td><td>90.2</td><td>95.0</td><td>97.5</td><td>75.5</td><td>75.8</td></tr>
+          <tr class="ours"><td class="left"></td><td>+ProLoss</td><td>ViT-L</td><td>256&times;192</td><td><b>90.0</b></td><td>96.7</td><td>94.5</td><td><b>91.9</b></td><td><b>98.0</b></td><td><b>95.7</b></td><td>97.0</td><td>98.2</td><td><b>92.3</b></td><td><b>85.9</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-note">Grey rows are off-the-shelf pre-trained models, which cannot predict semantic types at all.
+    <code>Abs</code> accuracy is computed only over non-residual keypoints, so that the large number of structurally
+    absent residual labels does not dominate the metric.</p>
+
+    <h3>Cross-dataset evaluation on ProGait</h3>
+    <p>To test generalisation, we manually annotated an independent test set from ProGait videos, sampling 2&ndash;3
+    frames from the initial and final quarters of each clip for postural diversity. ProLoss-finetuned models
+    consistently outperform the pre-trained baselines, and ViT-L remains the most robust against the long tail.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="left">Method</th><th>Training</th><th>Backbone</th><th>Input size</th>
+            <th>AP</th><th>AP<sup>50</sup></th><th>AP<sup>75</sup></th><th>AR</th>
+            <th>Type-Acc</th><th>Bio</th><th>Pros</th><th>Abs</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="pretrain"><td class="left">YoloxPose</td><td>Pretrain</td><td>YoloxPose-T</td><td>416&times;416</td><td>44.2</td><td>58.7</td><td>55.5</td><td>75.5</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr class="pretrain"><td class="left"></td><td>Pretrain</td><td>YoloxPose-L</td><td>640&times;640</td><td>42.9</td><td>52.4</td><td>51.7</td><td>84.1</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>YoloxPose-T</td><td>416&times;416</td><td>48.6</td><td>71.0</td><td>54.5</td><td>65.9</td><td>62.5</td><td>75.4</td><td>44.4</td><td>95.7</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>YoloxPose-L</td><td>640&times;640</td><td>69.8</td><td>89.4</td><td>83.9</td><td>78.1</td><td>73.6</td><td>87.7</td><td>54.9</td><td>96.7</td></tr>
+          <tr class="pretrain"><td class="left">Swin Transformer</td><td>Pretrain</td><td>Swin-T</td><td>256&times;192</td><td>75.3</td><td>97.9</td><td>93.3</td><td>79.6</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr class="pretrain"><td class="left"></td><td>Pretrain</td><td>Swin-L</td><td>384&times;288</td><td>73.7</td><td>96.8</td><td>90.5</td><td>78.1</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>Swin-T</td><td>256&times;192</td><td>87.5</td><td>98.9</td><td>96.8</td><td>90.3</td><td>61.9</td><td>63.5</td><td>59.0</td><td>96.8</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>Swin-L</td><td>384&times;288</td><td>88.5</td><td>98.9</td><td>97.8</td><td>91.1</td><td>92.3</td><td><b>97.9</b></td><td>84.7</td><td>97.9</td></tr>
+          <tr class="pretrain"><td class="left">RTMPose</td><td>Pretrain</td><td>RTMPose-T</td><td>256&times;192</td><td>75.7</td><td>97.7</td><td>93.3</td><td>80.7</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr class="pretrain"><td class="left"></td><td>Pretrain</td><td>RTMPose-L</td><td>256&times;192</td><td>79.7</td><td>96.8</td><td>95.6</td><td>83.9</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>RTMPose-T</td><td>256&times;192</td><td>84.9</td><td>97.9</td><td>95.8</td><td>87.3</td><td>85.0</td><td>94.8</td><td>72.5</td><td><b>99.1</b></td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>RTMPose-L</td><td>256&times;192</td><td>89.5</td><td><b>99.0</b></td><td><b>97.9</b></td><td>91.6</td><td>90.3</td><td>97.2</td><td>80.6</td><td><b>99.1</b></td></tr>
+          <tr class="pretrain"><td class="left">ViTPose</td><td>Pretrain</td><td>ViT-S</td><td>256&times;192</td><td>75.2</td><td>96.5</td><td>92.2</td><td>76.9</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr class="pretrain"><td class="left"></td><td>Pretrain</td><td>ViT-L</td><td>256&times;192</td><td>76.8</td><td>96.7</td><td>94.2</td><td>81.8</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td></tr>
+          <tr><td class="left"></td><td>+ProLoss</td><td>ViT-S</td><td>256&times;192</td><td>82.5</td><td>97.6</td><td>93.2</td><td>85.1</td><td>87.8</td><td>94.0</td><td>79.4</td><td>97.1</td></tr>
+          <tr class="ours"><td class="left"></td><td>+ProLoss</td><td>ViT-L</td><td>256&times;192</td><td><b>90.9</b></td><td><b>99.0</b></td><td><b>97.9</b></td><td><b>92.9</b></td><td><b>94.4</b></td><td>97.1</td><td><b>90.2</b></td><td>98.3</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>What the gains come from</h3>
+    <p>Synthetic data and ProLoss contribute separately: the data expansion mostly recovers rare <em>semantic</em>
+    categories, and ProLoss sharpens the residual boundary &mdash; both while AP stays essentially unchanged.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th class="left">Backbone</th><th>Data</th><th>Loss</th><th>AP</th><th>Type-Acc</th><th>Bio</th><th>Pros</th><th>Abs</th><th>Residual</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="left">ViTPose-B</td><td>Real</td><td>Standard</td><td>82.0</td><td>93.2</td><td>98.2</td><td>55.1</td><td>56.6</td><td>39.1</td></tr>
+          <tr><td class="left">ViTPose-B</td><td>Real+Syn</td><td>Standard</td><td>81.9</td><td>93.6</td><td>97.8</td><td>63.3</td><td>58.5</td><td>40.7</td></tr>
+          <tr class="ours"><td class="left">ViTPose-B</td><td>Real+Syn</td><td>ProLoss</td><td>82.0</td><td>95.0</td><td>97.5</td><td><b>75.5</b></td><td><b>75.8</b></td><td><b>64.0</b></td></tr>
+          <tr><td class="left">RTMPose-M</td><td>Real</td><td>Standard</td><td>88.9</td><td>94.5</td><td>98.6</td><td>63.5</td><td>67.3</td><td>47.1</td></tr>
+          <tr><td class="left">RTMPose-M</td><td>Real+Syn</td><td>Standard</td><td>88.7</td><td>96.1</td><td>98.7</td><td>79.8</td><td>76.0</td><td>67.9</td></tr>
+          <tr class="ours"><td class="left">RTMPose-M</td><td>Real+Syn</td><td>ProLoss</td><td>88.8</td><td>95.8</td><td>97.8</td><td><b>82.5</b></td><td><b>80.3</b></td><td><b>77.4</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-note">Per-joint, the effect of the synthetic data is largest exactly where the tail was thinnest
+    (ViT-B, Real &rarr; Real+Syn): prosthetic <b>elbows</b> 30.2% &rarr; 50.4% (+20.2), <b>wrists</b> 55.6% &rarr; 70.2%
+    (+14.6), <b>fingertips</b> 32.4% &rarr; 40.0% (+7.6), <b>knees</b> 50.5% &rarr; 56.6% (+6.1), while AP moves by
+    &minus;0.1 and AR by +0.3.</p>
+
+    <h3>Ablation of the ProLoss components</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Detach</th><th>SCW (Cls)</th><th>SCW (Reg)</th><th>&#8466;<sub>bio</sub></th>
+              <th>AP</th><th>AP<sub>50</sub></th><th>AP<sub>75</sub></th><th>AR</th>
+              <th>Type-Acc</th><th>Bio</th><th>Pros</th><th>Abs</th><th>Res-Bio</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>&#10003;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>89.7</td><td>96.6</td><td>94.4</td><td>91.9</td><td>96.6</td><td>98.3</td><td>85.7</td><td>82.4</td><td>76.6</td></tr>
+          <tr><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>&ndash;</td><td>89.9</td><td><b>96.7</b></td><td>94.4</td><td><b>92.0</b></td><td><b>97.4</b></td><td><b>99.1</b></td><td>89.7</td><td>81.9</td><td>78.5</td></tr>
+          <tr><td>&ndash;</td><td>&#10003;</td><td>&ndash;</td><td>&ndash;</td><td><b>90.0</b></td><td><b>96.7</b></td><td><b>94.5</b></td><td><b>92.0</b></td><td>97.3</td><td>98.7</td><td>90.7</td><td>84.6</td><td>81.1</td></tr>
+          <tr><td>&ndash;</td><td>&#10003;</td><td>&#10003;</td><td>&ndash;</td><td>89.7</td><td><b>96.7</b></td><td>94.4</td><td>91.8</td><td>97.3</td><td>98.6</td><td>91.5</td><td>85.1</td><td>81.7</td></tr>
+          <tr><td>&ndash;</td><td>&#10003;</td><td>&ndash;</td><td>Joint</td><td>89.6</td><td><b>96.7</b></td><td>94.4</td><td>91.6</td><td>97.1</td><td>98.4</td><td>91.5</td><td>84.9</td><td>81.5</td></tr>
+          <tr class="ours"><td>&ndash;</td><td>&#10003;</td><td>&ndash;</td><td>Staged</td><td><b>90.0</b></td><td><b>96.7</b></td><td><b>94.5</b></td><td>91.9</td><td>97.0</td><td>98.3</td><td><b>91.7</b></td><td><b>85.6</b></td><td><b>86.9</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-note">SCW = semantic categorisation weighting; Res-Bio = classification accuracy on the residual
+    endpoint keypoints. Letting classification gradients reach the shared backbone helps both tasks (+0.2 AP, +4.2
+    <code>Pros</code>); weighting the <em>regression</em> branch hurts; and applying &#8466;<sub>bio</sub> as a second
+    stage, after spatial features have stabilised, keeps peak AP while lifting Res-Bio by 5.8 points.</p>
+
+    <h3>Qualitative comparison</h3>
+    <figure>
+      <img src="images/qualitative_proloss_comparison.jpg" alt="Qualitative comparison between baselines and ProLoss">
+      <figcaption><b>Baselines vs. ProLoss.</b> Pre-trained baselines hallucinate biological limbs; LDLoss ignores
+      prostheses entirely; standard fine-tuning on coordinates alone cannot separate the semantic types and invents
+      absent joints. ProLoss categorises prosthetic and absent points correctly and reconstructs the kinematic
+      structure.</figcaption>
+    </figure>
+    <figure>
+      <img src="images/model_qualitative_comparison.jpg" alt="Qualitative results across pose estimation models trained with ProLoss">
+      <figcaption><b>Across architectures.</b> From left to right: ground truth, YOLO-Pose, ViTPose, Swin-Pose and
+      RTMPose, each trained with our loss on the ProPose dataset.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ============ DOWNLOAD / CITATION ============ -->
+<section id="download" class="section">
+  <div class="container">
+    <h2 class="section-title">Paper, Code &amp; Data</h2>
+    <p class="section-sub">The paper is under review at IEEE TIP. The code and the dataset will be released here.</p>
+
+    <div class="release-grid">
+      <div class="release-card">
+        <h4>Paper <span class="badge">coming soon</span></h4>
+        <p>The manuscript is currently under review at IEEE Transactions on Image Processing. A preprint will be linked
+        from this page.</p>
+      </div>
+      <div class="release-card">
+        <h4>Code <span class="badge">coming soon</span></h4>
+        <p>Training and evaluation code built on MMPose, including the ProLoss implementation and the Omni-Pose
+        annotation tooling.</p>
+      </div>
+      <div class="release-card">
+        <h4>Dataset <span class="badge">coming soon</span></h4>
+        <p>ProPose images and COCO-style annotations with the per-keypoint semantic type, released together with the
+        train/test splits used in the paper.</p>
+      </div>
+    </div>
+
+    <h3>Citation</h3>
+    <div class="citation-box">
+      <pre><code>@article{qi2026propose,
+  title   = {Topology-Unified 2D Pose Estimation across Intact, Residual and Prosthetic Limbs},
+  author  = {Qi, Tianye and Zhang, Tengyue and Ying, Jiaying and Zhu, Tianqing and Yu, Xin},
+  journal = {arXiv preprint},
+  year    = {2026}
+}</code></pre>
+      <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+    </div>
+
+    <h3>Related work from our group</h3>
+    <ul class="feature-list">
+      <li><a href="https://akitaraphael.github.io/ldpose/" target="_blank" rel="noopener">LDPose</a> &mdash; Towards
+      Inclusive Human Pose Estimation for Limb-Deficient Individuals in the Wild (ICCV 2025), the residual-limb
+      benchmark that ProPose extends.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <p>&copy; 2026 ProPose Team. All rights reserved.</p>
+    <p>For questions, please contact: <a href="mailto:uqtqi4@uq.edu.au">uqtqi4@uq.edu.au</a></p>
+  </div>
+</footer>
+
+<div class="modal" id="imageModal">
+  <span class="close" onclick="closeModal()">&times;</span>
+  <img id="modalImage" src="" alt="">
+  <div class="modal-caption" id="modalCaption"></div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
