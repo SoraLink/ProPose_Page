@@ -195,12 +195,6 @@ td b, th b { color: inherit; }
 ul.feature-list, ol.phase-list { margin: 10px 0 14px 20px; }
 ul.feature-list li, ol.phase-list li { margin-bottom: 8px; }
 
-/* ---------- math ---------- */
-.eq {
-    background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 12px 16px; margin: 16px 0; overflow-x: auto;
-}
-
 /* ---------- citation ---------- */
 .citation-box { position: relative; background: #101728; border-radius: var(--radius); padding: 20px 22px; overflow-x: auto; }
 .citation-box pre { color: #dbe4f5; font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: .86rem; line-height: 1.55; }

@@ -10,11 +10,6 @@
 <meta property="og:image" content="images/topology_ambiguity_comparison.jpg">
 <meta property="og:type" content="website">
 <link rel="stylesheet" href="style.css">
-<script>
-  window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['$$', '$$']] },
-                     options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] } };
-</script>
-<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
 
@@ -135,8 +130,8 @@
 
     <h3>Semantic type: the second annotation axis</h3>
     <p>Every keypoint additionally carries a semantic type
-    \(c \in \{\texttt{Biological}, \texttt{Prosthetic}, \texttt{Absent}\}\), which is what makes a single topology able
-    to describe every limb configuration:</p>
+    &mdash; <em>Biological</em>, <em>Prosthetic</em> or <em>Absent</em> &mdash; which is what makes a single topology
+    able to describe every limb configuration:</p>
     <div class="card-grid four">
       <div class="card bio">
         <h4><span class="dot bio"></span> Intact</h4>
@@ -166,7 +161,7 @@
     <h4>Visibility protocol</h4>
     <p>Conventional visibility flags describe whether a <em>coordinate</em> can be observed, not whether a joint
     <em>exists</em>. When a residual limb is clearly visible and no prosthesis is worn, the absence of the subsequent
-    joints is itself an observable anatomical fact. We therefore give such keypoints a visible flag (\(v=2\)) together
+    joints is itself an observable anatomical fact. We therefore give such keypoints a visible flag (<code>v = 2</code>) together
     with the <em>Absent</em> type: the absence is visible and deterministic, even though no coordinate is annotated.</p>
 
     <figure>
@@ -343,44 +338,28 @@
     below it &mdash; and the loss should say so.</p>
 
     <h3>Problem formulation</h3>
-    <p>We formulate Omni-Human Pose Estimation as joint coordinate regression and semantic attribution. For an input
-    image \(I \in \mathbb{R}^{H \times W \times 3}\) the model predicts \(K\) keypoints</p>
-    <div class="eq">$$\mathbf{p}_i = (\mathbf{x}_i,\, s_i,\, c_i), \qquad
-      \mathbf{x}_i \in \mathbb{R}^2,\; s_i \in [0,1],\;
-      c_i \in \mathcal{C} = \{\texttt{Bio}, \texttt{Pros}, \texttt{Abs}\}.$$</div>
-    <p>For keypoints labelled <code>Abs</code> the coordinate has no physical referent, so coordinate supervision is
-    masked out while the type label is kept for classification.</p>
+    <p>We formulate Omni-Human Pose Estimation as coordinate regression and semantic attribution learned together:
+    for every keypoint the model predicts a 2D location, a confidence, and one of the three semantic types
+    (<code>Bio</code>, <code>Pros</code>, <code>Abs</code>). For keypoints labelled <code>Abs</code> the coordinate has
+    no physical referent, so coordinate supervision is masked out while the type label is kept for classification.</p>
 
     <h3>Distribution-aligned supervision</h3>
     <p>The imbalance between biological and prosthetic/absent joints is severe enough that a plain cross-entropy is
-    dominated by the majority class. We apply a decoupled inverse-square-root weight to the classification branch
-    only:</p>
-    <div class="eq">$$\omega_{i,c}^{cls} = \frac{1/\sqrt{N_{i,c}}}
-      {\frac{1}{|\mathcal{C}_{valid}|}\sum_{j \in \mathcal{C}_{valid}} 1/\sqrt{N_{i,j}}},$$</div>
-    <div class="eq">$$\mathcal{L}_{reg} = \frac{1}{K}\sum_{i=1}^{K}\mathbb{1}(v_i>0 \ \&\ c_i^* \neq \text{absent})\,
-      \ell(\mathbf{p}_i,\hat{\mathbf{p}}_i), \qquad
-      \mathcal{L}_{cls} = -\frac{1}{K}\sum_{i=1}^{K}\mathbb{1}(v_i>0)\,\omega_{i,c_i^*}^{cls}
-      \sum_{c \in \mathcal{C}} y^*_{i,c}\log \hat{y}_{i,c}.$$</div>
-    <p>Spatial regression is unaffected by the semantic long tail, and our ablation confirms that re-weighting it
-    actively hurts &mdash; so the weighting stays on the classification branch alone.</p>
+    dominated by the majority class. ProLoss therefore re-weights the semantic classification of each keypoint by the
+    inverse square root of how often that type occurs at that joint, normalised over the types the joint actually
+    admits &mdash; rare states such as a prosthetic elbow are pulled back up without the weight exploding.</p>
+    <p>The weighting is applied to the classification branch alone. Spatial regression is unaffected by the semantic
+    long tail, and our ablation confirms that re-weighting it actively hurts localisation.</p>
 
     <h3>Bio-Contrastive Boundary Loss</h3>
-    <p>Each limb branch admits exactly one anatomically valid terminal state. For an annotated residual keypoint
-    \(r\) we define its <em>mutually exclusive set</em> \(\Omega_r\) of keypoints on the same limb branch that cannot
-    coexist with it, and contrast the biological confidence of \(r\) against them:</p>
-    <div class="eq">$$\mathcal{P}_r = \frac{\exp(p_r^{\text{bio}}/\tau)}
-      {\exp(p_r^{\text{bio}}/\tau) + \sum_{j \in \Omega_r}\mathbb{1}(v_j>0)\exp(p_j^{\text{bio}}/\tau)},
-      \qquad
-      \mathcal{L}_{bio} = -\frac{1}{|\mathcal{R}|}\sum_{r \in \mathcal{R}}
-      \mathbb{1}(v_r>0\ \&\ c_r^*=\textit{Biological}) \log \mathcal{P}_r .$$</div>
-    <p>Minimising \(\mathcal{L}_{bio}\) raises the probability of the true residual endpoint while suppressing
-    biological predictions for its descendant joints &mdash; a kinematic filter against hallucinated limbs. The total
-    objective is</p>
-    <div class="eq">$$\mathcal{L}_{total} = \lambda_{reg}\mathcal{L}_{reg} + \lambda_{cls}\mathcal{L}_{cls}
-      + \lambda_{bio}\mathcal{L}_{bio},$$</div>
-    <p>with \(\lambda_{reg}=1\), \(\lambda_{cls}=0.05\), \(\lambda_{bio}=0.01\) and \(\tau=0.2\) in all experiments.
-    AP and Type-Acc remain stable under moderate variation of these values, so ProLoss needs no task-specific
-    tuning.</p>
+    <p>Each limb branch admits exactly one anatomically valid terminal state. For an annotated residual keypoint we
+    define its <em>mutually exclusive set</em>: the keypoints on the same limb branch that cannot coexist with it.
+    The loss then contrasts the biological confidence of the true residual endpoint against every keypoint in that
+    set, raising the probability of the real amputation boundary while suppressing biological predictions for the
+    joints below it &mdash; a kinematic filter against hallucinated limbs.</p>
+    <p>The three terms &mdash; coordinate regression, distribution-aligned semantic classification, and the
+    bio-contrastive boundary term &mdash; are summed with fixed weights of 1, 0.05 and 0.01 in all experiments. AP and
+    Type-Acc remain stable under moderate variation of these values, so ProLoss needs no task-specific tuning.</p>
   </div>
 </section>
 
